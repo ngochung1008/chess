@@ -1,0 +1,17 @@
+# Bỏ qua thư mục venv
+venv/
+ENV/
+env/
+
+# File cache của Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# File tạm, log
+*.log
+*.tmp
+
+# VSCode settings (nếu có)
+.vscode/
