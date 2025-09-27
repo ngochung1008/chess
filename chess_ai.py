@@ -1,3 +1,5 @@
+# chess_ai.py
+
 import chess
 import math
 
@@ -10,7 +12,7 @@ PIECE_VALUES = {
     chess.BISHOP: 300,
     chess.ROOK: 500,
     chess.QUEEN: 900,
-    chess.KING: 0
+    chess.KING: 100000,
 }
 
 # -------------------------
@@ -94,15 +96,25 @@ PSQT = {
 # -------------------------
 # Hàm đánh giá
 # -------------------------
-def evaluate_board(board: chess.Board) -> int:
+def evaluate(board):
     score = 0
-    for square, piece in board.piece_map().items():
-        value = PIECE_VALUES[piece.piece_type]
-        if piece.color == chess.WHITE:
-            score += value + PSQT[piece.piece_type][square]
-        else:
-            mirrored = chess.square_mirror(square)
-            score -= value + PSQT[piece.piece_type][mirrored]
+    
+    # material + PSQT
+    for piece_type in PIECE_VALUES:
+        for sq in board.pieces(piece_type, chess.WHITE):
+            score += PIECE_VALUES[piece_type] + PSQT[piece_type][sq]
+        for sq in board.pieces(piece_type, chess.BLACK):
+            score -= PIECE_VALUES[piece_type] + PSQT[piece_type][chess.square_mirror(sq)]
+    
+    # mobility
+    score += len(list(board.legal_moves)) * (10 if board.turn == chess.WHITE else -10)
+
+    # castling rights bonus
+    if board.has_kingside_castling_rights(chess.WHITE) or board.has_queenside_castling_rights(chess.WHITE):
+        score += 20
+    if board.has_kingside_castling_rights(chess.BLACK) or board.has_queenside_castling_rights(chess.BLACK):
+        score -= 20
+    
     return score
 
 # -------------------------
@@ -116,7 +128,8 @@ def capture_value(board, move):
         captured = board.piece_at(move.to_square)
         attacker = board.piece_at(move.from_square)
         if captured and attacker:
-            return PIECE_VALUES[captured.piece_type] - PIECE_VALUES[attacker.piece_type] // 10
+            # MVV-LVA: ưu tiên bắt quân giá trị lớn bởi attacker giá trị nhỏ
+            return PIECE_VALUES[captured.piece_type] * 100 - PIECE_VALUES[attacker.piece_type]
     return 0
 
 # -------------------------
@@ -124,7 +137,7 @@ def capture_value(board, move):
 # -------------------------
 def alpha_beta(board, depth, alpha, beta, maximizing_player):
     if depth == 0 or board.is_game_over():
-        return evaluate_board(board)
+        return evaluate(board)
 
     moves = order_moves(board, list(board.legal_moves))
 
@@ -132,8 +145,17 @@ def alpha_beta(board, depth, alpha, beta, maximizing_player):
         max_eval = -math.inf
         for move in moves:
             board.push(move)
-            eval = alpha_beta(board, depth-1, alpha, beta, False)
+
+            # ---- Bonus cho move đặc biệt ----
+            move_bonus = 0
+            if board.is_castling(move):
+                move_bonus += 50
+            if board.is_en_passant(move):
+                move_bonus += 30
+
+            eval = alpha_beta(board, depth-1, alpha, beta, False) + move_bonus
             board.pop()
+
             max_eval = max(max_eval, eval)
             alpha = max(alpha, eval)
             if beta <= alpha:
@@ -143,8 +165,16 @@ def alpha_beta(board, depth, alpha, beta, maximizing_player):
         min_eval = math.inf
         for move in moves:
             board.push(move)
-            eval = alpha_beta(board, depth-1, alpha, beta, True)
+
+            move_bonus = 0
+            if board.is_castling(move):
+                move_bonus -= 50
+            if board.is_en_passant(move):
+                move_bonus -= 30
+
+            eval = alpha_beta(board, depth-1, alpha, beta, True) + move_bonus
             board.pop()
+
             min_eval = min(min_eval, eval)
             beta = min(beta, eval)
             if beta <= alpha:
@@ -160,8 +190,16 @@ def find_best_move(board, depth=3):
         max_eval = -math.inf
         for move in order_moves(board, list(board.legal_moves)):
             board.push(move)
-            eval = alpha_beta(board, depth-1, -math.inf, math.inf, False)
+
+            move_bonus = 0
+            if board.is_castling(move):
+                move_bonus += 50
+            if board.is_en_passant(move):
+                move_bonus += 30
+
+            eval = alpha_beta(board, depth-1, -math.inf, math.inf, False) + move_bonus
             board.pop()
+
             if eval > max_eval:
                 max_eval = eval
                 best_move = move
@@ -169,8 +207,16 @@ def find_best_move(board, depth=3):
         min_eval = math.inf
         for move in order_moves(board, list(board.legal_moves)):
             board.push(move)
-            eval = alpha_beta(board, depth-1, -math.inf, math.inf, True)
+
+            move_bonus = 0
+            if board.is_castling(move):
+                move_bonus -= 50
+            if board.is_en_passant(move):
+                move_bonus -= 30
+
+            eval = alpha_beta(board, depth-1, -math.inf, math.inf, True) + move_bonus
             board.pop()
+
             if eval < min_eval:
                 min_eval = eval
                 best_move = move

@@ -1,3 +1,5 @@
+# chess_main.py
+
 import sys
 from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QLabel
 from chess_gui import ChessBoardWidget

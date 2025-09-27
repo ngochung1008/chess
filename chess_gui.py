@@ -1,3 +1,5 @@
+# chess_gui.py
+
 import chess
 import time
 from PyQt6.QtWidgets import QWidget
