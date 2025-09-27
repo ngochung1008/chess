@@ -39,54 +39,10 @@ KNIGHT_TABLE = [
     -40,-20,  0,  5,  5,  0,-20,-40,
     -50,-40,-30,-30,-30,-30,-40,-50
 ]
-BISHOP_TABLE = [
-    -20,-10,-10,-10,-10,-10,-10,-20,
-    -10,  0,  0,  0,  0,  0,  0,-10,
-    -10,  0,  5, 10, 10,  5,  0,-10,
-    -10,  5,  5, 10, 10,  5,  5,-10,
-    -10,  0, 10, 10, 10, 10,  0,-10,
-    -10, 10, 10, 10, 10, 10, 10,-10,
-    -10,  5,  0,  0,  0,  0,  5,-10,
-    -20,-10,-10,-10,-10,-10,-10,-20
-]
-ROOK_TABLE = [
-     0,  0,  0,  0,  0,  0,  0,  0,
-     5, 10, 10, 10, 10, 10, 10,  5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-    -5,  0,  0,  0,  0,  0,  0, -5,
-     0,  0,  0,  5,  5,  0,  0,  0
-]
-QUEEN_TABLE = [
-    -20,-10,-10, -5, -5,-10,-10,-20,
-    -10,  0,  0,  0,  0,  0,  0,-10,
-    -10,  0,  5,  5,  5,  5,  0,-10,
-     -5,  0,  5,  5,  5,  5,  0, -5,
-      0,  0,  5,  5,  5,  5,  0, -5,
-    -10,  5,  5,  5,  5,  5,  0,-10,
-    -10,  0,  5,  0,  0,  0,  0,-10,
-    -20,-10,-10, -5, -5,-10,-10,-20
-]
-KING_TABLE = [
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -30,-40,-40,-50,-50,-40,-40,-30,
-    -20,-30,-30,-40,-40,-30,-30,-20,
-    -10,-20,-20,-20,-20,-20,-20,-10,
-     20, 20,  0,  0,  0,  0, 20, 20,
-     20, 30, 10,  0,  0, 10, 30, 20
-]
 
 PSQT = {
     chess.PAWN: PAWN_TABLE,
-    chess.KNIGHT: KNIGHT_TABLE,
-    chess.BISHOP: BISHOP_TABLE,
-    # chess.ROOK: ROOK_TABLE,
-    # chess.QUEEN: QUEEN_TABLE,
-    # chess.KING: KING_TABLE
+    chess.KNIGHT: KNIGHT_TABLE
 }
 
 # -------------------------
@@ -116,18 +72,13 @@ def mvv_lva_score(board: chess.Board, move: chess.Move):
 # -------------------------
 # Evaluation
 # -------------------------
-def evaluate_board(board: chess.Board, depth: int = 0) -> int:
-    """Đánh giá bàn cờ, dương = lợi cho trắng, âm = lợi cho đen."""
-
-    # Checkmate / draw
+def evaluate_board(board: chess.Board) -> int:
     if board.is_checkmate():
-        return -999999 + depth if board.turn else 999999 - depth
+        return -999999 if board.turn else 999999
     if board.is_stalemate() or board.is_insufficient_material():
         return 0
 
     score = 0
-
-    # Material + PSQT
     for piece_type, val in PIECE_VALUES.items():
         for sq in board.pieces(piece_type, chess.WHITE):
             score += val
@@ -137,75 +88,7 @@ def evaluate_board(board: chess.Board, depth: int = 0) -> int:
             score -= val
             if piece_type in PSQT:
                 score -= PSQT[piece_type][chess.square_mirror(sq)]
-
-    # Mobility
-    score += 5 * (len(list(board.legal_moves)))
-    board.push(chess.Move.null())
-    score -= 5 * (len(list(board.legal_moves)))
-    board.pop()
-
-    # Pawn structure
-    pawns_white = board.pieces(chess.PAWN, chess.WHITE)
-    pawns_black = board.pieces(chess.PAWN, chess.BLACK)
-
-    # Double pawns penalty
-    for file in range(8):
-        cnt_w = len([sq for sq in pawns_white if chess.square_file(sq) == file])
-        cnt_b = len([sq for sq in pawns_black if chess.square_file(sq) == file])
-        if cnt_w > 1:
-            score -= 15 * (cnt_w - 1)
-        if cnt_b > 1:
-            score += 15 * (cnt_b - 1)
-
-    # Isolated pawns penalty
-    for sq in pawns_white:
-        f = chess.square_file(sq)
-        if not any(chess.square_file(p) in [f-1, f+1] for p in pawns_white):
-            score -= 15
-    for sq in pawns_black:
-        f = chess.square_file(sq)
-        if not any(chess.square_file(p) in [f-1, f+1] for p in pawns_black):
-            score += 15
-
-    # Bishop pair bonus
-    if len(board.pieces(chess.BISHOP, chess.WHITE)) >= 2:
-        score += 30
-    if len(board.pieces(chess.BISHOP, chess.BLACK)) >= 2:
-        score -= 30
-
-    # Rook on open file
-    for sq in board.pieces(chess.ROOK, chess.WHITE):
-        if all(chess.square_file(p) != chess.square_file(sq) for p in pawns_white | pawns_black):
-            score += 20
-    for sq in board.pieces(chess.ROOK, chess.BLACK):
-        if all(chess.square_file(p) != chess.square_file(sq) for p in pawns_white | pawns_black):
-            score -= 20
-
-    # King safety (cơ bản: thưởng khi có tốt che trước mặt)
-    king_w = board.king(chess.WHITE)
-    if king_w is not None:
-        kf = chess.square_file(king_w)
-        kr = chess.square_rank(king_w)
-        for df in [-1, 0, 1]:
-            f = kf + df
-            r = kr + 1
-            if 0 <= f < 8 and r <= 7:
-                if chess.square(f, r) in pawns_white:
-                    score += 10
-
-    king_b = board.king(chess.BLACK)
-    if king_b is not None:
-        kf = chess.square_file(king_b)
-        kr = chess.square_rank(king_b)
-        for df in [-1, 0, 1]:
-            f = kf + df
-            r = kr - 1
-            if 0 <= f < 8 and r >= 0:
-                if chess.square(f, r) in pawns_black:
-                    score -= 10
-
     return score
-
 
 # -------------------------
 # Quiescence
@@ -285,16 +168,6 @@ def alpha_beta(board: chess.Board, depth: int, alpha: int, beta: int, maximizing
 def find_best_move_iterative(board: chess.Board, max_depth=5, time_limit=3.0):
     best_move = None
     start_time = time.time()
-
-    move_count = board.legal_moves.count()
-
-    # Điều chỉnh depth theo số nước đi còn lại
-    if move_count > 40:
-        max_depth = max_depth        # midgame: ít sâu
-    elif move_count > 20:
-        max_depth = max_depth + 1    # giữa giữa
-    else:
-        max_depth = max_depth + 2    # endgame: sâu hơn
 
     for depth in range(1, max_depth + 1):
         if time.time() - start_time > time_limit:
