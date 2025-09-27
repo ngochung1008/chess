@@ -281,4 +281,4 @@ if __name__ == "__main__":
     app = QApplication(sys.argv)
     gui = ChessGUI()
     gui.show()
-    sys.exit(app.exec())
+    sys.exit(app.exec()) 
