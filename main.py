@@ -1,6 +1,6 @@
 import sys
 from PyQt6.QtWidgets import QApplication
-from ui import ChessWindow
+from ui import ChessWindow 
 
 def main():
     app = QApplication(sys.argv)
