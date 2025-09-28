@@ -3,21 +3,17 @@
 import chess
 import math
 
-# -------------------------
 # Giá trị quân cơ bản
-# -------------------------
 PIECE_VALUES = {
     chess.PAWN: 100,
     chess.KNIGHT: 300,
     chess.BISHOP: 300,
     chess.ROOK: 500,
     chess.QUEEN: 900,
-    chess.KING: 100000,
+    chess.KING: 100000, 
 }
 
-# -------------------------
 # Piece-Square Tables
-# -------------------------
 PAWN_TABLE = [
      0,  0,  0,  0,  0,  0,  0,  0,
      5, 10, 10,-20,-20, 10, 10,  5,
@@ -93,21 +89,37 @@ PSQT = {
     chess.KING: KING_TABLE
 }
 
-# -------------------------
 # Hàm đánh giá
-# -------------------------
 def evaluate(board):
+    # mate / draw
+    MATE_SCORE = 100000
+    if board.is_checkmate():
+        return -MATE_SCORE if board.turn == chess.WHITE else MATE_SCORE
+    if board.is_stalemate() or board.is_insufficient_material():
+        return 0
+    
     score = 0
+    # material + PSQT 
+    for sq, piece in board.piece_map().items():
+        val = PIECE_VALUES[piece.piece_type]
+        table = PSQT[piece.piece_type]
+        if piece.color == chess.WHITE:
+            score += val + table[sq]
+        else:
+            score -= val + table[chess.square_mirror(sq)]
     
-    # material + PSQT
-    for piece_type in PIECE_VALUES:
-        for sq in board.pieces(piece_type, chess.WHITE):
-            score += PIECE_VALUES[piece_type] + PSQT[piece_type][sq]
-        for sq in board.pieces(piece_type, chess.BLACK):
-            score -= PIECE_VALUES[piece_type] + PSQT[piece_type][chess.square_mirror(sq)]
-    
-    # mobility
-    score += len(list(board.legal_moves)) * (10 if board.turn == chess.WHITE else -10)
+    # mobility 
+    if board.turn == chess.WHITE:
+        white_moves = sum(1 for _ in board.legal_moves)
+        board.push(chess.Move.null())
+        black_moves = sum(1 for _ in board.legal_moves)
+        board.pop()
+    else:
+        black_moves = sum(1 for _ in board.legal_moves)
+        board.push(chess.Move.null())
+        white_moves = sum(1 for _ in board.legal_moves)
+        board.pop()
+    score += (white_moves - black_moves) * 10
 
     # castling rights bonus
     if board.has_kingside_castling_rights(chess.WHITE) or board.has_queenside_castling_rights(chess.WHITE):
@@ -117,24 +129,19 @@ def evaluate(board):
     
     return score
 
-# -------------------------
 # Move ordering (ưu tiên bắt quân)
-# -------------------------
 def order_moves(board, moves):
     return sorted(moves, key=lambda m: capture_value(board, m), reverse=True)
 
 def capture_value(board, move):
-    if board.is_capture(move):
+    if board.is_capture(move): 
         captured = board.piece_at(move.to_square)
         attacker = board.piece_at(move.from_square)
-        if captured and attacker:
-            # MVV-LVA: ưu tiên bắt quân giá trị lớn bởi attacker giá trị nhỏ
-            return PIECE_VALUES[captured.piece_type] * 100 - PIECE_VALUES[attacker.piece_type]
-    return 0
+        if captured and attacker: 
+            return PIECE_VALUES[captured.piece_type] * 100 - PIECE_VALUES[attacker.piece_type] 
+    return 0  
 
-# -------------------------
 # Alpha-Beta
-# -------------------------
 def alpha_beta(board, depth, alpha, beta, maximizing_player):
     if depth == 0 or board.is_game_over():
         return evaluate(board)
@@ -146,18 +153,18 @@ def alpha_beta(board, depth, alpha, beta, maximizing_player):
         for move in moves:
             board.push(move)
 
-            # ---- Bonus cho move đặc biệt ----
-            move_bonus = 0
+            move_bonus = 0 
             if board.is_castling(move):
                 move_bonus += 50
             if board.is_en_passant(move):
                 move_bonus += 30
 
             eval = alpha_beta(board, depth-1, alpha, beta, False) + move_bonus
-            board.pop()
+            board.pop() 
 
             max_eval = max(max_eval, eval)
             alpha = max(alpha, eval)
+
             if beta <= alpha:
                 break
         return max_eval
@@ -181,9 +188,7 @@ def alpha_beta(board, depth, alpha, beta, maximizing_player):
                 break
         return min_eval
 
-# -------------------------
 # Tìm nước đi tốt nhất
-# -------------------------
 def find_best_move(board, depth=3):
     best_move = None
     if board.turn == chess.WHITE:
@@ -191,13 +196,7 @@ def find_best_move(board, depth=3):
         for move in order_moves(board, list(board.legal_moves)):
             board.push(move)
 
-            move_bonus = 0
-            if board.is_castling(move):
-                move_bonus += 50
-            if board.is_en_passant(move):
-                move_bonus += 30
-
-            eval = alpha_beta(board, depth-1, -math.inf, math.inf, False) + move_bonus
+            eval = alpha_beta(board, depth-1, -math.inf, math.inf, False)
             board.pop()
 
             if eval > max_eval:
@@ -208,16 +207,10 @@ def find_best_move(board, depth=3):
         for move in order_moves(board, list(board.legal_moves)):
             board.push(move)
 
-            move_bonus = 0
-            if board.is_castling(move):
-                move_bonus -= 50
-            if board.is_en_passant(move):
-                move_bonus -= 30
-
-            eval = alpha_beta(board, depth-1, -math.inf, math.inf, True) + move_bonus
+            eval = alpha_beta(board, depth-1, -math.inf, math.inf, True)
             board.pop()
 
             if eval < min_eval:
                 min_eval = eval
                 best_move = move
-    return best_move
+    return best_move 
