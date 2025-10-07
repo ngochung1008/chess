@@ -101,6 +101,7 @@ class ChessBoardWidget(QWidget):
 
     def ai_move(self):
         self.update_status("AI thinking...")
+        self.repaint()
         start_time = time.time()
         move = find_best_move(self.board, depth=4)
         if move:
